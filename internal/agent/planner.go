@@ -1,11 +1,16 @@
 package agent
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/rickif/tiny-research/internal/config"
+	"github.com/rickif/tiny-research/internal/llm"
+	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/prompts"
 )
 
@@ -16,63 +21,65 @@ type PlanOptions struct {
 	AllowRead    bool
 	AllowSearch  bool
 	BeastMode    bool
-	AgentState   *AgentState
+	AgentState   AgentState
 }
 
 type Planner struct {
-	options PlanOptions
+	llm *openai.LLM
 }
 
-func NewPlanner(options PlanOptions) *Planner {
-	return &Planner{
-		options: options,
+func NewPlanner(config *config.Config) (*Planner, error) {
+	llm, err := openai.New(openai.WithBaseURL(config.LLMBaseURL), openai.WithModel(config.LLMModel), openai.WithToken(config.LLMToken))
+	if err != nil {
+		return nil, fmt.Errorf("create planner: %w", err)
 	}
+	return &Planner{llm: llm}, nil
 }
 
-func (planner *Planner) BuildPrompt() (string, error) {
+func (planner *Planner) buildPrompt(options PlanOptions) (outputPrompt string, outputFieldNames []string, err error) {
 	var promptSections []string
 
 	template, err := os.ReadFile("../prompts/planner/header.md")
 	if err != nil {
-		return "", fmt.Errorf("read header prompt file: %w", err)
+		return "", nil, fmt.Errorf("read header prompt file: %w", err)
 	}
 	prompt, err := prompts.NewPromptTemplate(
 		string(template),
 		[]string{"current_time", "question"},
 	).Format(map[string]any{
 		"current_time": time.Now().Format("2006-01-02 15:04:05"),
-		"question":     planner.options.Question,
+		"question":     options.Question,
 	})
 	if err != nil {
-		return "", fmt.Errorf("format header prompt: %w", err)
+		return "", nil, fmt.Errorf("format header prompt: %w", err)
 	}
 	promptSections = append(promptSections, prompt)
 
-	if len(planner.options.AgentState.Contexts) > 0 {
+	if len(options.AgentState.Contexts) > 0 {
 		template, err = os.ReadFile("../prompts/planner/context.md")
 		if err != nil {
-			return "", fmt.Errorf("read context prompt file: %w", err)
+			return "", nil, fmt.Errorf("read context prompt file: %w", err)
 		}
 
 		contextPrompt, err := prompts.NewPromptTemplate(
 			string(template),
 			[]string{"context"},
 		).Format(map[string]any{
-			"context": strings.Join(planner.options.AgentState.Contexts, "\n"),
+			"context": strings.Join(options.AgentState.Contexts, "\n"),
 		})
 		if err != nil {
-			return "", fmt.Errorf("format context prompt: %w", err)
+			return "", nil, fmt.Errorf("format context prompt: %w", err)
 		}
 		promptSections = append(promptSections, contextPrompt)
 	}
 
-	if len(planner.options.AgentState.Knowledges) > 0 {
+	if len(options.AgentState.Knowledges) > 0 {
 		var knowledgePrompts []string
 		template, err = os.ReadFile("../prompts/planner/knowledge.md")
 		if err != nil {
-			return "", fmt.Errorf("read knowledge prompt file: %w", err)
+			return "", nil, fmt.Errorf("read knowledge prompt file: %w", err)
 		}
-		for _, knowledge := range planner.options.AgentState.Knowledges {
+		for _, knowledge := range options.AgentState.Knowledges {
 			knowledgePrompt, _ := prompts.NewPromptTemplate(
 				string(template),
 				[]string{"question", "answer", "reference"},
@@ -86,7 +93,7 @@ func (planner *Planner) BuildPrompt() (string, error) {
 
 		template, err = os.ReadFile("../prompts/planner/knowledges.md")
 		if err != nil {
-			return "", fmt.Errorf("read knowledges prompt file: %w", err)
+			return "", nil, fmt.Errorf("read knowledges prompt file: %w", err)
 		}
 
 		knowledgePrompt, err := prompts.NewPromptTemplate(
@@ -96,19 +103,19 @@ func (planner *Planner) BuildPrompt() (string, error) {
 			"knowledges": strings.Join(knowledgePrompts, "\n"),
 		})
 		if err != nil {
-			return "", fmt.Errorf("format knowledges prompt: %w", err)
+			return "", nil, fmt.Errorf("format knowledges prompt: %w", err)
 		}
 		promptSections = append(promptSections, knowledgePrompt)
 	}
 
-	if len(planner.options.AgentState.BadAttempts) > 0 {
+	if len(options.AgentState.BadAttempts) > 0 {
 		template, err = os.ReadFile("../prompts/planner/bad-attempt.md")
 		if err != nil {
-			return "", fmt.Errorf("read bad attempt prompt file: %w", err)
+			return "", nil, fmt.Errorf("read bad attempt prompt file: %w", err)
 		}
 
 		var badAttemptPrompts []string
-		for _, attempt := range planner.options.AgentState.BadAttempts {
+		for _, attempt := range options.AgentState.BadAttempts {
 			badAttemptPrompt, err := prompts.NewPromptTemplate(
 				string(template),
 				[]string{"question", "answer", "reject_reason", "recap", "blame"},
@@ -120,19 +127,19 @@ func (planner *Planner) BuildPrompt() (string, error) {
 				"blame":         attempt.ActionBlame,
 			})
 			if err != nil {
-				return "", fmt.Errorf("format bad attempt prompt: %w", err)
+				return "", nil, fmt.Errorf("format bad attempt prompt: %w", err)
 			}
 			badAttemptPrompts = append(badAttemptPrompts, badAttemptPrompt)
 		}
 
 		var improvments []string
-		for _, attempt := range planner.options.AgentState.BadAttempts {
+		for _, attempt := range options.AgentState.BadAttempts {
 			improvments = append(improvments, attempt.Improvement)
 		}
 
 		template, err = os.ReadFile("../prompts/planner/bad-attempts.md")
 		if err != nil {
-			return "", fmt.Errorf("read bad attempts prompt file: %w", err)
+			return "", nil, fmt.Errorf("read bad attempts prompt file: %w", err)
 		}
 		badAttemptsPrompt, err := prompts.NewPromptTemplate(
 			string(template),
@@ -142,72 +149,75 @@ func (planner *Planner) BuildPrompt() (string, error) {
 			"learned_strategy": strings.Join(improvments, "\n"),
 		})
 		if err != nil {
-			return "", fmt.Errorf("format bad attempts prompt: %w", err)
+			return "", nil, fmt.Errorf("format bad attempts prompt: %w", err)
 		}
 		promptSections = append(promptSections, badAttemptsPrompt)
 	}
 
 	var actionPromptSections []string
-	if planner.options.AllowRead && len(planner.options.AgentState.ActionState.AllURLs) > 0 {
+	if options.AllowRead && len(options.AgentState.ActionState.AllURLs) > 0 {
 		template, err = os.ReadFile("../prompts/planner/action-visit.md")
 		if err != nil {
-			return "", fmt.Errorf("read action visit prompt file: %w", err)
+			return "", nil, fmt.Errorf("read action visit prompt file: %w", err)
 		}
 
 		actionVisitPrompt, err := prompts.NewPromptTemplate(
 			string(template),
 			[]string{"urls"},
 		).Format(map[string]any{
-			"urls": planner.options.AgentState.ActionState.AllURLs,
+			"urls": options.AgentState.ActionState.AllURLs,
 		})
 		if err != nil {
-			return "", fmt.Errorf("format action visit prompt: %w", err)
+			return "", nil, fmt.Errorf("format action visit prompt: %w", err)
 		}
 		actionPromptSections = append(actionPromptSections, actionVisitPrompt)
 	}
 
-	if planner.options.AllowSearch {
+	if options.AllowSearch {
 		prompt, err := os.ReadFile("../prompts/planner/action-search.md")
 		if err != nil {
-			return "", fmt.Errorf("read action search prompt file: %w", err)
+			return "", nil, fmt.Errorf("read action search prompt file: %w", err)
 		}
 		actionPromptSections = append(actionPromptSections, string(prompt))
+		outputFieldNames = append(outputFieldNames, "search")
 	}
 
-	if planner.options.AllowAnswer {
+	if options.AllowAnswer {
 		var prompt []byte
 		var err error
-		if planner.options.AllowReflect {
+		if options.AllowReflect {
 			prompt, err = os.ReadFile("../prompts/planner/action-answer-with-reflect.md")
 		} else {
 			prompt, err = os.ReadFile("../prompts/planner/action-answer.md")
 		}
 		if err != nil {
-			return "", fmt.Errorf("read action answer prompt file: %w", err)
+			return "", nil, fmt.Errorf("read action answer prompt file: %w", err)
 		}
 		actionPromptSections = append(actionPromptSections, string(prompt))
+		outputFieldNames = append(outputFieldNames, "answer")
 	}
 
-	if planner.options.BeastMode {
+	if options.BeastMode {
 		prompt, err := os.ReadFile("../prompts/planner/action-answer-beast-mode.md")
 		if err != nil {
-			return "", fmt.Errorf("read action answer beast mode prompt file: %w", err)
+			return "", nil, fmt.Errorf("read action answer beast mode prompt file: %w", err)
 		}
 		actionPromptSections = append(actionPromptSections, string(prompt))
 	}
 
-	if planner.options.AllowReflect {
+	if options.AllowReflect {
 		prompt, err := os.ReadFile("../prompts/planner/action-reflect.md")
 		if err != nil {
-			return "", fmt.Errorf("read action reflect prompt file: %w", err)
+			return "", nil, fmt.Errorf("read action reflect prompt file: %w", err)
 		}
 		actionPromptSections = append(actionPromptSections, string(prompt))
+		outputFieldNames = append(outputFieldNames, "reflect")
 	}
 
 	if len(actionPromptSections) > 0 {
 		template, err = os.ReadFile("../prompts/planner/action-selections.md")
 		if err != nil {
-			return "", fmt.Errorf("read action selections prompt file: %w", err)
+			return "", nil, fmt.Errorf("read action selections prompt file: %w", err)
 		}
 
 		actionsPrompt, err := prompts.NewPromptTemplate(
@@ -217,16 +227,38 @@ func (planner *Planner) BuildPrompt() (string, error) {
 			"action_selections": strings.Join(actionPromptSections, "\n\n"),
 		})
 		if err != nil {
-			return "", fmt.Errorf("format action selections prompt: %w", err)
+			return "", nil, fmt.Errorf("format action selections prompt: %w", err)
 		}
 		promptSections = append(promptSections, actionsPrompt)
 	}
 
 	footerPrompt, err := os.ReadFile("../prompts/planner/footer.md")
 	if err != nil {
-		return "", fmt.Errorf("read footer prompt file: %w", err)
+		return "", nil, fmt.Errorf("read footer prompt file: %w", err)
 	}
 	promptSections = append(promptSections, string(footerPrompt))
 
-	return strings.Join(promptSections, "\n\n"), nil
+	return strings.Join(promptSections, "\n\n"), nil, nil
+}
+
+// Test only
+func (planner *Planner) BuildPrompt(options PlanOptions) (string, error) {
+	prompt, err := planner.buildPrompt(options)
+	if err != nil {
+		return "", fmt.Errorf("build prompt: %w", err)
+	}
+	return prompt, nil
+}
+
+type Plan struct {
+}
+
+func (planner *Planner) Plan(options PlanOptions) {
+	prompt, err := planner.buildPrompt(options)
+	if err != nil {
+		slog.Error("build prompt", "error", err)
+		return
+	}
+
+	llm.GenerateJSON(context.Background(), planner.llm, prompt, &Plan{}, []string{}, 3)
 }
