@@ -13,12 +13,12 @@ type Config struct {
 	LLMToken   string
 }
 
-func LoadConfig() (*Config, error) {
+func LoadConfig() (Config, error) {
 	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("failed to load env file: %w", err)
+		return Config{}, fmt.Errorf("failed to load env file: %w", err)
 	}
 
-	return &Config{
+	return Config{
 		LLMModel:   os.Getenv("LLM_MODEL"),
 		LLMBaseURL: os.Getenv("LLM_BASE_URL"),
 		LLMToken:   os.Getenv("LLM_TOKEN"),
