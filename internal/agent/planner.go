@@ -31,6 +31,7 @@ func NewPlanner(llm *openai.LLM, maxIterations int, maxStepNum int) *Planner {
 func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextStep string, output string, err error) {
 	slog.Info("planner starts")
 	if state.PlanIterations >= planner.maxIterations {
+		slog.Info("plan iterations reaches max iterations", "plan_iterations", state.PlanIterations)
 		return StepReporter, "", nil
 	}
 
@@ -64,13 +65,16 @@ func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextSte
 		return "", "", err
 	}
 
+	slog.Info("planner output", "plan", output)
+
 	nextStep = StepResearchTeam
 	if plan.HasEnoughContext {
+		slog.Info("plan has enough context")
 		nextStep = StepReporter
 	}
 
 	state.Messages = append(state.Messages, llms.MessageContent{
-		Role:  llms.ChatMessageTypeHuman,
+		Role:  llms.ChatMessageTypeAI,
 		Parts: []llms.ContentPart{llms.TextContent{Text: output}},
 	})
 	state.LastPlan = state.CurrentPlan

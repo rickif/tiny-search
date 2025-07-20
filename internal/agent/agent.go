@@ -37,7 +37,7 @@ func (wf *Agent) Research(ctx context.Context, query string) (string, error) {
 				Parts: []llms.ContentPart{llms.TextContent{Text: query}},
 			},
 		},
-		Locale: "zh-CN",
+		Locale: "en-US",
 	}
 	coordinator := NewCoordinator(wf.llm)
 	planner := NewPlanner(wf.llm, 3, 3)

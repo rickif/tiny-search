@@ -162,7 +162,7 @@ const (
 )
 
 type Step struct {
-	NeedWebSearch bool   `json:"need_web_search"`
+	NeedSearch bool   `json:"need_search"`
 	Title         string `json:"title"`
 	Description   string `json:"description"`
 	StepType      string `json:"step_type"`

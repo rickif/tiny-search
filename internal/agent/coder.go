@@ -73,7 +73,7 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 
 		for _, toolcall := range resp.Choices[0].ToolCalls {
 			switch toolcall.FunctionCall.Name {
-			case "python":
+			case "python-executor":
 				var args struct {
 					Code string `json:"code"`
 				}
@@ -97,30 +97,7 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 					},
 				}
 				messages = append(messages, message)
-			case "bash":
-				var args struct {
-					Cmd string `json:"cmd"`
-				}
-				if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
-					slog.Error("unmarshal arguments", "error", err)
-					return "", "", err
-				}
-				output, err = tool.Bash(ctx, args.Cmd)
-				if err != nil {
-					slog.Error("bash", "error", err)
-					return "", "", err
-				}
-				message := llms.MessageContent{
-					Role: llms.ChatMessageTypeTool,
-					Parts: []llms.ContentPart{
-						llms.ToolCallResponse{
-							ToolCallID: toolcall.ID,
-							Name:       toolcall.FunctionCall.Name,
-							Content:    output,
-						},
-					},
-				}
-				messages = append(messages, message)
+				slog.Info("coder use python", "code", args.Code)
 			default:
 				slog.Error("unexpected function call", "name", toolcall.FunctionCall.Name)
 				return "", "", fmt.Errorf("unexpected function call: %v", toolcall.FunctionCall.Name)
@@ -132,7 +109,15 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 			step.ExecutionResult = resp.Choices[0].Content
 			break
 		}
-		slog.Info("coder use tools", "count", len(resp.Choices[0].ToolCalls))
+		var toolCalls []string
+		for _, toolcall := range resp.Choices[0].ToolCalls {
+			toolCalls = append(toolCalls, toolcall.FunctionCall.Name)
+		}
+		slog.Info("coder use tools", "tools", toolCalls)
 	}
+	state.Messages = append(state.Messages, llms.MessageContent{
+		Role:  llms.ChatMessageTypeHuman,
+		Parts: []llms.ContentPart{llms.TextContent{Text: step.ExecutionResult}},
+	})
 	return StepResearchTeam, output, nil
 }

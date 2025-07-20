@@ -67,7 +67,6 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 		}}
 
 	for {
-		slog.Info("researcher asks")
 		resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))
 		if err != nil {
 			slog.Error("generate content", "error", err)
@@ -84,7 +83,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 					slog.Error("unmarshal arguments", "error", err)
 					return "", "", err
 				}
-				output, err = tool.Crawl(ctx, args.URL)
+				output, err := tool.Crawl(ctx, args.URL)
 				if err != nil {
 					slog.Error("crawl", "error", err)
 					return "", "", err
@@ -100,6 +99,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 					},
 				}
 				messages = append(messages, message)
+				slog.Info("researcher use crawl", "url", args.URL)
 			case "tavily_search":
 				var args struct {
 					Query string `json:"query"`
@@ -108,7 +108,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 					slog.Error("unmarshal arguments", "error", err)
 					return "", "", err
 				}
-				output, err = tool.NewTavilySearchTool(r.tavilyKey).Search(ctx, args.Query)
+				output, err := tool.NewTavilySearchTool(r.tavilyKey).Search(ctx, args.Query)
 				if err != nil {
 					slog.Error("search", "error", err)
 					return "", "", err
@@ -124,6 +124,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 					},
 				}
 				messages = append(messages, message)
+				slog.Info("researcher use tavily search", "query", args.Query)
 			default:
 				slog.Error("unexpected function call", "name", toolcall.FunctionCall.Name)
 				return "", "", fmt.Errorf("unexpected function call: %v", toolcall.FunctionCall.Name)
@@ -134,7 +135,15 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 			step.ExecutionResult = resp.Choices[0].Content
 			break
 		}
-		slog.Info("researcher use tools", "count", len(resp.Choices[0].ToolCalls))
+		var toolCalls []string
+		for _, toolcall := range resp.Choices[0].ToolCalls {
+			toolCalls = append(toolCalls, fmt.Sprintf("%s: %s", toolcall.FunctionCall.Name, toolcall.FunctionCall.Arguments))
+		}
+		slog.Info("researcher use tools", "tools", toolCalls)
 	}
-	return StepResearchTeam, output, nil
+	state.Messages = append(state.Messages, llms.MessageContent{
+		Role:  llms.ChatMessageTypeHuman,
+		Parts: []llms.ContentPart{llms.TextContent{Text: step.ExecutionResult}},
+	})
+	return StepResearchTeam, step.ExecutionResult, nil
 }
