@@ -11,16 +11,16 @@ import (
 	"github.com/tmc/langchaingo/prompts"
 )
 
-var coordinatorTools = []llms.Tool{
-	{
-		Type: "function",
-		Function: &llms.FunctionDefinition{
-			Name:        "handoff_to_planner",
-			Description: "Handoff to planner agent to do plan",
-			Parameters:  map[string]any{},
-		},
+var coordinatorTool = llms.Tool{
+	Type: "function",
+	Function: &llms.FunctionDefinition{
+		Name:        "handoff_to_planner",
+		Description: "Handoff to planner agent to do plan",
+		Parameters:  map[string]any{},
 	},
 }
+
+var _ Node = (*Coordinator)(nil)
 
 type Coordinator struct {
 	llm *openai.LLM
@@ -32,44 +32,39 @@ func NewCoordinator(llm *openai.LLM) *Coordinator {
 	}
 }
 
-func (coord *Coordinator) Coordinate(state *AgentState) (*AgentUpdate, error) {
+func (coord *Coordinator) Execute(ctx context.Context, state *AgentState) (nextStep string, output string, err error) {
 	// load prompts
 	content, err := os.ReadFile("./internal/prompts/coordinator.md")
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
-	promptTemplate, err := prompts.NewPromptTemplate(string(content), []string{"CURRENT_TIME"}).Format(map[string]any{
-		"CURRENT_TIME": time.Now().Format(time.RFC3339),
+	promptTemplate, err := prompts.NewPromptTemplate(string(content), []string{"current_time"}).Format(map[string]any{
+		"current_time": time.Now().Format(time.RFC3339),
 	})
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
-	var msgs []llms.MessageContent
-	msgs = append(msgs, llms.MessageContent{
-		Role:  llms.ChatMessageTypeHuman,
+	var messages []llms.MessageContent
+	messages = append(messages, llms.MessageContent{
+		Role:  llms.ChatMessageTypeSystem,
 		Parts: []llms.ContentPart{llms.TextContent{Text: promptTemplate}},
 	})
 
-	msgs = append(msgs, state.Messages...)
+	messages = append(messages, state.Messages...)
 
-	resp, err := coord.llm.GenerateContent(context.Background(), msgs, llms.WithTools(coordinatorTools))
+	resp, err := coord.llm.GenerateContent(context.Background(), messages, llms.WithTools([]llms.Tool{coordinatorTool}))
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("empty response")
+		return "", "", fmt.Errorf("empty response")
 	}
 
 	if len(resp.Choices[0].ToolCalls) > 0 {
-		return &AgentUpdate{
-			NextStep: StepPlanner,
-		}, nil
+		return StepPlanner, "", nil
 	}
 
-	return &AgentUpdate{
-		NextStep: StepEnd,
-		Output:   resp.Choices[0].Content,
-	}, nil
+	return StepEnd, resp.Choices[0].Content, nil
 }

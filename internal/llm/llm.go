@@ -11,30 +11,29 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
-func GenerateJSON(ctx context.Context, llm llms.Model, prompt string, result any, fields []string, maxRetries int, options ...llms.CallOption) error {
-	var retErr error
+func GenerateJSON(ctx context.Context, llm llms.Model, messages []llms.MessageContent, result any, maxRetries int, options ...llms.CallOption) (output string, err error) {
+	var resp *llms.ContentResponse
 	for i := 0; i < maxRetries; i++ {
-		resp, err := llms.GenerateFromSinglePrompt(ctx, llm, prompt, append(options, llms.WithJSONMode())...)
+		resp, err = llm.GenerateContent(ctx, messages, append(options, llms.WithJSONMode())...)
 		if err != nil {
 			slog.Error("generate from single prompt", "error", err)
-			retErr = err
 			continue
 		}
+		output = resp.Choices[0].Content
 
-		resp = util.FixJSON(resp)
+		output = util.FixJSON(output)
 
-		if err := json.Unmarshal([]byte(resp), result); err != nil {
+		if err = json.Unmarshal([]byte(output), result); err != nil {
 			slog.Error("unmarshal json", "error", err)
-			retErr = err
 			continue
 		}
 
 		validator := validator.New()
-		if err := validator.StructPartial(result, fields...); err != nil {
+		if err = validator.Struct(result); err != nil {
 			slog.Error("validate json", "error", err)
-			retErr = err
 			continue
 		}
+		return output, nil
 	}
-	return fmt.Errorf("generate json: %w", retErr)
+	return "", fmt.Errorf("generate json: %w", err)
 }

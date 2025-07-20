@@ -34,7 +34,7 @@ func main() {
 		return
 	}
 
-	result, err := agent.Research(context.Background(), "How are you?")
+	result, err := agent.Research(context.Background(), "What's the weather like in Chengdu today?")
 	if err != nil {
 		slog.Error("research", "error", err)
 		return
