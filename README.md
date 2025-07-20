@@ -1,101 +1,76 @@
-# Deep Research Agent
+# Tiny Research
 
-A sophisticated research agent built with Go and LangChain Go, designed to perform comprehensive research tasks with intelligent information gathering and analysis capabilities.
-
-## Overview
-
-This project implements a deep research agent that can autonomously conduct research on various topics, gather information from multiple sources, analyze data, and provide comprehensive reports. The agent leverages the power of large language models through LangChain Go to understand context, plan research strategies, and synthesize findings.
-
-## Technology Stack
-
-- **Go**: Core programming language for performance and concurrency
-- **LangChain Go**: Framework for building LLM-powered applications
-- **Additional technologies**: To be determined based on specific requirements
+This a deep research agent built with Golang, designed to perform comprehensive research tasks with intelligent information gathering and analysis capabilities. This project is mainly inspired by [DeerFlow](https://github.com/bytedance/deer-flow), thanks for their contributions.
 
 ## Project Structure
 
 ```
 tiny-research/
-├── README.md                 # Project documentation
-├── go.mod                   # Go module definition
-├── go.sum                   # Go dependencies checksum
-├── main.go                  # Application entry point
-├── cmd/                     # Command-line interfaces
-│   └── research/            # Research agent CLI
-├── internal/                # Private application code
-│   ├── agent/              # Core agent implementation
-│   │   ├── research.go     # Main research agent logic
-│   │   ├── planner.go      # Research planning strategies
-│   │   └── executor.go     # Task execution engine
-│   ├── sources/            # Information source integrations
-│   │   ├── web/            # Web scraping and search
-│   │   ├── academic/       # Academic database access
-│   │   └── documents/      # Document processing
-│   ├── llm/                # Language model integrations
-│   │   ├── client.go       # LLM client wrapper
-│   │   ├── prompts/        # Prompt templates
-│   │   └── chains/         # LangChain Go chains
-│   ├── storage/            # Data persistence layer
-│   │   ├── memory/         # In-memory storage
-│   │   ├── database/       # Database operations
-│   │   └── cache/          # Caching mechanisms
-│   ├── analysis/           # Data analysis and processing
-│   │   ├── summarizer.go   # Content summarization
-│   │   ├── classifier.go   # Information classification
-│   │   └── synthesizer.go  # Research synthesis
-│   └── utils/              # Utility functions
-│       ├── http.go         # HTTP utilities
-│       ├── text.go         # Text processing
-│       └── config.go       # Configuration management
-├── pkg/                    # Public library code
-│   ├── types/              # Shared data types
-│   └── interfaces/         # Public interfaces
-├── configs/                # Configuration files
-│   ├── config.yaml         # Main configuration
-│   └── prompts.yaml        # Prompt configurations
-├── docs/                   # Documentation
-│   ├── architecture.md     # System architecture
-│   ├── api.md             # API documentation
-│   └── examples/           # Usage examples
-├── scripts/                # Build and deployment scripts
-│   ├── build.sh           # Build script
-│   └── deploy.sh          # Deployment script
-└── tests/                  # Test files
-    ├── integration/        # Integration tests
-    └── unit/              # Unit tests
+├── .env                     # Environment variables
+├── .gitignore              # Git ignore file
+├── README.md               # Project documentation
+├── go.mod                  # Go module definition
+├── go.sum                  # Go dependencies checksum
+├── main.go                 # Application entry point
+├── internal/               # Private application code
+│   ├── agent/             # Core agent implementation
+│   │   ├── agent.go       # Main agent orchestrator
+│   │   ├── coder.go       # Code generation agent
+│   │   ├── coordinator.go # Workflow coordinator
+│   │   ├── executor.go    # Task execution engine
+│   │   ├── planner.go     # Research planning strategies
+│   │   ├── reporter.go    # Report generation agent
+│   │   ├── research_team.go # Research team coordination
+│   │   ├── researcher.go  # Individual researcher agent
+│   │   └── state.go       # Agent state management
+│   ├── config/            # Configuration management
+│   │   └── config.go      # Environment-based configuration
+│   ├── llm/               # Language model integrations
+│   │   └── llm.go         # LLM client wrapper
+│   ├── prompts/           # Prompt templates
+│   │   ├── coder.md       # Code generation prompts
+│   │   ├── coordinator.md # Coordination prompts
+│   │   ├── planner.md     # Planning prompts
+│   │   ├── reporter.md    # Reporting prompts
+│   │   └── researcher.md  # Research prompts
+│   └── tool/              # Research tools
+│       ├── crawl.go       # Web crawling (Jina AI)
+│       ├── python.go      # Python code execution
+│       └── search.go      # Web search (Tavily API)
+└── util/                  # Utility functions
+    └── json.go            # JSON processing utilities
 ```
 
 ## Core Components
 
-### Research Agent (`internal/agent/`)
-The heart of the system that orchestrates the research process:
-- **Research Planner**: Breaks down research queries into actionable tasks
-- **Task Executor**: Executes individual research tasks
-- **Result Synthesizer**: Combines findings into coherent reports
+### Multi-Agent System (`internal/agent/`)
+A sophisticated workflow orchestration system with specialized agents:
+- **Coordinator**: Orchestrates the overall research workflow and determines next steps
+- **Planner**: Creates detailed research plans with structured steps and strategies
+- **Research Team**: Manages team-based research coordination and task distribution
+- **Researcher**: Executes individual research tasks using available tools
+- **Coder**: Handles code generation and programming-related research tasks
+- **Reporter**: Synthesizes findings into comprehensive reports
+- **Agent State**: Manages conversation history, plans, and workflow state
 
-### Information Sources (`internal/sources/`)
-Modular integrations for various information sources:
-- **Web Sources**: Search engines, websites, APIs
-- **Academic Sources**: Research papers, journals, databases
-- **Document Processing**: PDF, Word, text file analysis
+### Research Tools (`internal/tool/`)
+Integrated tools for information gathering and processing:
+- **Tavily Search**: Web search capabilities using Tavily API for real-time information
+- **Web Crawling**: Content extraction from URLs using Jina AI's reader service
+- **Bash Execution**: Command-line tool execution for system operations
+- **Python Execution**: Python code execution for data processing and analysis
 
 ### LLM Integration (`internal/llm/`)
 LangChain Go integration for language model operations:
-- **Chain Management**: Custom chains for different research tasks
-- **Prompt Engineering**: Optimized prompts for research scenarios
-- **Model Abstraction**: Support for multiple LLM providers
+- **OpenAI Integration**: Primary LLM provider with configurable models and endpoints
+- **Prompt Templates**: Specialized prompts for each agent type stored in markdown files
+- **Tool Integration**: Seamless integration between LLM and research tools
 
-### Storage Layer (`internal/storage/`)
-Flexible storage solutions for research data:
-- **Memory Storage**: Fast in-memory caching
-- **Persistent Storage**: Database for long-term data
-- **Cache Management**: Intelligent caching strategies
-
-### Analysis Engine (`internal/analysis/`)
-Advanced analysis capabilities:
-- **Content Summarization**: Extract key insights from sources
-- **Information Classification**: Categorize and tag findings
-- **Research Synthesis**: Generate comprehensive reports
+### Configuration Management (`internal/config/`)
+Environment-based configuration system:
+- **Environment Variables**: Secure API key and configuration management
+- **LLM Configuration**: Configurable model, base URL, and authentication
+- **Tool Configuration**: API keys for external services (Tavily, etc.)
 
 ## Features
 
@@ -103,15 +78,13 @@ Advanced analysis capabilities:
 - 🌐 **Multi-Source Integration**: Gathers information from diverse sources
 - 🧠 **LLM-Powered Analysis**: Leverages advanced language models for understanding
 - 📊 **Comprehensive Reporting**: Generates detailed research reports
-- ⚡ **Concurrent Processing**: Efficient parallel information gathering
-- 🔄 **Iterative Refinement**: Continuously improves research quality
-- 💾 **Persistent Memory**: Maintains context across research sessions
 
 ## Getting Started
 
 ### Prerequisites
-- Go 1.21 or higher
-- API keys for LLM providers (OpenAI, Anthropic, etc.)
+- Go 1.23 or higher
+- OpenAI API key (or compatible LLM provider)
+- Tavily API key for web search
 - Internet connection for web-based research
 
 ### Installation
@@ -121,74 +94,64 @@ Advanced analysis capabilities:
 git clone https://github.com/rickif/tiny-research.git
 cd tiny-research
 
-# Install dependencies
 go mod download
 
 # Build the application
-go build -o research ./cmd/research
+go build -o tiny-research .
 ```
 
 ### Configuration
 
-1. Copy the example configuration:
+1. Create a `.env` file in the project root:
 ```bash
-cp configs/config.yaml.example configs/config.yaml
+cp .env.example .env  # If example exists, or create manually
 ```
 
-2. Edit the configuration file with your API keys and preferences
+2. Edit the `.env` file with your API keys and configuration:
+```env
+# LLM Configuration
+LLM_MODEL=gpt-4o-mini
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_TOKEN=your_openai_api_key_here
+
+# Search Configuration
+TAVILY_KEY=your_tavily_api_key_here
+```
 
 3. Run the research agent:
 ```bash
-./research "Your research query here"
+./tiny-research
 ```
+
+The application will execute the hardcoded research query. To customize the query, modify the `main.go` file.
 
 ## Usage Examples
 
-```bash
-# Basic research query
-./research "What are the latest developments in quantum computing?"
+Currently, the research query is hardcoded in `main.go`. The default example query is:
 
-# Research with specific sources
-./research --sources=academic,web "Climate change impact on agriculture"
-
-# Generate detailed report
-./research --format=detailed "Artificial intelligence in healthcare"
+```go
+result, err := agent.Research(context.Background(), "What's the weather like in Chengdu today?")
 ```
 
-## Development
+### Customizing Research Queries
 
-### Running Tests
-```bash
-# Run all tests
-go test ./...
+To research different topics, modify the query in `main.go`:
 
-# Run with coverage
-go test -cover ./...
-
-# Run integration tests
-go test ./tests/integration/...
+```go
+// Example queries you can try:
+result, err := agent.Research(context.Background(), "What are the latest developments in quantum computing?")
+result, err := agent.Research(context.Background(), "Explain the impact of AI on healthcare")
+result, err := agent.Research(context.Background(), "Write a Python script to analyze stock market data")
 ```
 
-### Contributing
+### Multi-Agent Workflow
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
-
-## Roadmap
-
-- [ ] Basic research agent implementation
-- [ ] Web source integration
-- [ ] LangChain Go integration
-- [ ] Academic database connectors
-- [ ] Advanced analysis features
-- [ ] Web interface
-- [ ] API endpoints
-- [ ] Plugin system for custom sources
-- [ ] Multi-language support
-- [ ] Cloud deployment options
+The system automatically:
+1. **Coordinates** the research workflow
+2. **Plans** the research strategy with structured steps
+3. **Research** for information using Tavily API and Jina AI search
+4. **Code** code when programming is needed
+5. **Reports** comprehensive findings
 
 ## License
 
@@ -196,6 +159,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- [LangChain Go](https://github.com/tmc/langchaingo) for the excellent LLM framework
-- The Go community for amazing tools and libraries
-- Contributors and researchers who inspire this project
+- [deerflow](https://github.com/bytedance/deer-flow)
+- [langchaingo](https://github.com/tmc/langchaingo)
