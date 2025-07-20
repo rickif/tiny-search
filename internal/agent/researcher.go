@@ -29,6 +29,7 @@ func NewResearcher(llm *openai.LLM, tavilyKey string) *Researcher {
 }
 
 func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep string, output string, err error) {
+	slog.Info("researcher starts")
 	content, err := os.ReadFile("./internal/prompts/researcher.md")
 	if err != nil {
 		slog.Error("read prompt template", "error", err)
@@ -65,74 +66,75 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 			Parts: []llms.ContentPart{llms.TextContent{Text: fmt.Sprintf("#Task\n\ntitle: %s\n\n##description:%s", step.Title, step.Description)}},
 		}}
 
-	resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))
-	if err != nil {
-		slog.Error("generate content", "error", err)
-		return "", "", err
-	}
-
-	for _, toolcall := range resp.Choices[0].ToolCalls {
-		switch toolcall.FunctionCall.Name {
-		case "crawl":
-			var args struct {
-				URL string `json:"url"`
-			}
-			if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
-				slog.Error("unmarshal arguments", "error", err)
-				return "", "", err
-			}
-			output, err = tool.Crawl(ctx, args.URL)
-			if err != nil {
-				slog.Error("crawl", "error", err)
-				return "", "", err
-			}
-			message := llms.MessageContent{
-				Role: llms.ChatMessageTypeTool,
-				Parts: []llms.ContentPart{
-					llms.ToolCallResponse{
-						ToolCallID: toolcall.ID,
-						Name:       toolcall.FunctionCall.Name,
-						Content:    output,
-					},
-				},
-			}
-			messages = append(messages, message)
-		case "tavily_search":
-			var args struct {
-				Query string `json:"query"`
-			}
-			if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
-				slog.Error("unmarshal arguments", "error", err)
-				return "", "", err
-			}
-			output, err = tool.NewTavilySearchTool(r.tavilyKey).Search(ctx, args.Query)
-			if err != nil {
-				slog.Error("search", "error", err)
-				return "", "", err
-			}
-			message := llms.MessageContent{
-				Role: llms.ChatMessageTypeTool,
-				Parts: []llms.ContentPart{
-					llms.ToolCallResponse{
-						ToolCallID: toolcall.ID,
-						Name:       toolcall.FunctionCall.Name,
-						Content:    output,
-					},
-				},
-			}
-			messages = append(messages, message)
-		default:
-			slog.Error("unexpected function call", "name", toolcall.FunctionCall.Name)
-			return "", "", fmt.Errorf("unexpected function call: %v", toolcall.FunctionCall.Name)
+	for {
+		slog.Info("researcher asks")
+		resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))
+		if err != nil {
+			slog.Error("generate content", "error", err)
+			return "", "", err
 		}
-	}
 
-	resp, err = r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))
-	if err != nil {
-		slog.Error("generate content", "error", err)
-		return "", "", err
+		for _, toolcall := range resp.Choices[0].ToolCalls {
+			switch toolcall.FunctionCall.Name {
+			case "crawl":
+				var args struct {
+					URL string `json:"url"`
+				}
+				if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
+					slog.Error("unmarshal arguments", "error", err)
+					return "", "", err
+				}
+				output, err = tool.Crawl(ctx, args.URL)
+				if err != nil {
+					slog.Error("crawl", "error", err)
+					return "", "", err
+				}
+				message := llms.MessageContent{
+					Role: llms.ChatMessageTypeTool,
+					Parts: []llms.ContentPart{
+						llms.ToolCallResponse{
+							ToolCallID: toolcall.ID,
+							Name:       toolcall.FunctionCall.Name,
+							Content:    output,
+						},
+					},
+				}
+				messages = append(messages, message)
+			case "tavily_search":
+				var args struct {
+					Query string `json:"query"`
+				}
+				if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
+					slog.Error("unmarshal arguments", "error", err)
+					return "", "", err
+				}
+				output, err = tool.NewTavilySearchTool(r.tavilyKey).Search(ctx, args.Query)
+				if err != nil {
+					slog.Error("search", "error", err)
+					return "", "", err
+				}
+				message := llms.MessageContent{
+					Role: llms.ChatMessageTypeTool,
+					Parts: []llms.ContentPart{
+						llms.ToolCallResponse{
+							ToolCallID: toolcall.ID,
+							Name:       toolcall.FunctionCall.Name,
+							Content:    output,
+						},
+					},
+				}
+				messages = append(messages, message)
+			default:
+				slog.Error("unexpected function call", "name", toolcall.FunctionCall.Name)
+				return "", "", fmt.Errorf("unexpected function call: %v", toolcall.FunctionCall.Name)
+			}
+		}
+		if len(resp.Choices[0].ToolCalls) == 0 {
+			slog.Info("researcher finished")
+			step.ExecutionResult = resp.Choices[0].Content
+			break
+		}
+		slog.Info("researcher use tools", "count", len(resp.Choices[0].ToolCalls))
 	}
-
-	step.ExecutionResult = resp.Choices[0].Content
 	return StepResearchTeam, output, nil
 }

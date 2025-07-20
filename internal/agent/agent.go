@@ -44,6 +44,7 @@ func (wf *Agent) Research(ctx context.Context, query string) (string, error) {
 	researchTeam := NewResearchTeam(wf.llm)
 	researcher := NewResearcher(wf.llm, wf.config.TavilyKey)
 	coder := NewCoder(wf.llm)
+	reporter := NewReporter(wf.llm)
 
 	nextStep, output, err := coordinator.Execute(ctx, &state)
 	if err != nil {
@@ -61,6 +62,8 @@ func (wf *Agent) Research(ctx context.Context, query string) (string, error) {
 			nextStep, output, err = researcher.Execute(ctx, &state)
 		case StepCoder:
 			nextStep, output, err = coder.Execute(ctx, &state)
+		case StepReporter:
+			nextStep, output, err = reporter.Execute(ctx, &state)
 		case StepEnd:
 			return output, nil
 		default:

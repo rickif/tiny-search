@@ -11,7 +11,7 @@ import (
 var PythonTool = llms.Tool{
 	Type: "function",
 	Function: &llms.FunctionDefinition{
-		Name:        "python",
+		Name:        "python_executor",
 		Description: "Use this to execute python code and do data analysis or calculation. If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.",
 		Parameters: map[string]any{
 			"type": "object",

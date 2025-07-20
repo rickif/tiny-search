@@ -29,8 +29,9 @@ func NewPlanner(llm *openai.LLM, maxIterations int, maxStepNum int) *Planner {
 }
 
 func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextStep string, output string, err error) {
+	slog.Info("planner starts")
 	if state.PlanIterations >= planner.maxIterations {
-		return StepEnd, "", nil
+		return StepReporter, "", nil
 	}
 
 	content, err := os.ReadFile("./internal/prompts/planner.md")
@@ -75,6 +76,8 @@ func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextSte
 	state.LastPlan = state.CurrentPlan
 	state.CurrentPlan = &plan
 	state.PlanIterations += 1
+
+	slog.Info("planner ends", "plan_iterations", state.PlanIterations)
 
 	return nextStep, output, nil
 }

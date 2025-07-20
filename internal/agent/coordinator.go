@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -36,6 +37,7 @@ func (coord *Coordinator) Execute(ctx context.Context, state *AgentState) (nextS
 	// load prompts
 	content, err := os.ReadFile("./internal/prompts/coordinator.md")
 	if err != nil {
+		slog.Info("read coordinator prompt file", "error", err)
 		return "", "", err
 	}
 	promptTemplate, err := prompts.NewPromptTemplate(string(content), []string{"current_time", "locale"}).Format(map[string]any{
