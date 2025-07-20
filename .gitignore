@@ -1,4 +1,8 @@
 # editor
 .vscode
 
+# env
 .env
+
+# binary
+tiny-research
