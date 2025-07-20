@@ -64,7 +64,8 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 		{
 			Role:  llms.ChatMessageTypeHuman,
 			Parts: []llms.ContentPart{llms.TextContent{Text: fmt.Sprintf("#Task\n\ntitle: %s\n\n##description:%s", step.Title, step.Description)}},
-		}}
+		},
+	}
 
 	for {
 		resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))

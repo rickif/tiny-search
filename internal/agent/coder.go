@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rickif/tiny-research/internal/tool"
@@ -54,6 +55,13 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 		}
 	}
 
+	var existingFindings []string
+	for i, step := range state.CurrentPlan.Steps {
+		if step.ExecutionResult != "" {
+			existingFindings = append(existingFindings, fmt.Sprintf("## Existing Finding %d: %s\n\n<finding>%s</finding>", i+1, step.Title, step.ExecutionResult))
+		}
+	}
+
 	messages := []llms.MessageContent{
 		{
 			Role:  llms.ChatMessageTypeSystem,
@@ -62,7 +70,12 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 		{
 			Role:  llms.ChatMessageTypeHuman,
 			Parts: []llms.ContentPart{llms.TextContent{Text: fmt.Sprintf("#Task\n\ntitle: %s\n\n##description:%s", step.Title, step.Description)}},
-		}}
+		},
+		{
+			Role:  llms.ChatMessageTypeHuman,
+			Parts: []llms.ContentPart{llms.TextContent{Text: fmt.Sprintf("#Existing Findings\n\n%s", strings.Join(existingFindings, "\n\n"))}},
+		},
+	}
 
 	for {
 		resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.PythonTool}))
@@ -97,7 +110,7 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 					},
 				}
 				messages = append(messages, message)
-				slog.Info("coder use python", "code", args.Code)
+				slog.Info("coder use python")
 			default:
 				slog.Error("unexpected function call", "name", toolcall.FunctionCall.Name)
 				return "", "", fmt.Errorf("unexpected function call: %v", toolcall.FunctionCall.Name)

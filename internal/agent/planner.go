@@ -65,7 +65,10 @@ func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextSte
 		return "", "", err
 	}
 
-	slog.Info("planner output", "plan", output)
+	slog.Info("planner output", "steps", len(plan.Steps))
+	for _, step := range plan.Steps {
+		slog.Info("plan step", "title", step.Title, "type", step.StepType, "description", step.Description)
+	}
 
 	nextStep = StepResearchTeam
 	if plan.HasEnoughContext {
