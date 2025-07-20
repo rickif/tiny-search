@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"os/exec"
@@ -27,9 +28,12 @@ var PythonTool = llms.Tool{
 }
 
 func Python(ctx context.Context, code string) (string, error) {
-	output, err := exec.Command("python", "-c", code).Output()
+	var buffer bytes.Buffer
+	command := exec.Command("python", "-c", code)
+	command.Stderr = &buffer
+	output, err := command.Output()
 	if err != nil {
-		slog.Error("execute python command", "error", err, "command", code)
+		slog.Error("execute python command", "error", err, "command", code, "stderr", buffer.String())
 		return "", err
 	}
 	return string(output), nil

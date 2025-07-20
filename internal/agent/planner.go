@@ -65,16 +65,7 @@ func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextSte
 		return "", "", err
 	}
 
-	slog.Info("planner output", "steps", len(plan.Steps))
-	for _, step := range plan.Steps {
-		slog.Info("plan step", "title", step.Title, "type", step.StepType, "description", step.Description)
-	}
-
 	nextStep = StepResearchTeam
-	if plan.HasEnoughContext {
-		slog.Info("plan has enough context")
-		nextStep = StepReporter
-	}
 
 	state.Messages = append(state.Messages, llms.MessageContent{
 		Role:  llms.ChatMessageTypeAI,
@@ -84,7 +75,16 @@ func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextSte
 	state.CurrentPlan = &plan
 	state.PlanIterations += 1
 
-	slog.Info("planner ends", "plan_iterations", state.PlanIterations)
+	if plan.HasEnoughContext {
+		slog.Info("plan has enough context")
+		nextStep = StepReporter
+		return nextStep, output, nil
+	}
+
+	slog.Info("planner ends", "steps", len(plan.Steps), "planner_iterations", state.PlanIterations)
+	for i, step := range plan.Steps {
+		slog.Info("plan step", "id", i+1, "title", step.Title, "type", step.StepType, "description", step.Description)
+	}
 
 	return nextStep, output, nil
 }

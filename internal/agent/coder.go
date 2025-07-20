@@ -110,7 +110,7 @@ func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string
 					},
 				}
 				messages = append(messages, message)
-				slog.Info("coder use python")
+				slog.Info("coder use python", "output", output)
 			default:
 				slog.Error("unexpected function call", "name", toolcall.FunctionCall.Name)
 				return "", "", fmt.Errorf("unexpected function call: %v", toolcall.FunctionCall.Name)
