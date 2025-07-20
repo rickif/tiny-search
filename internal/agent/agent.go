@@ -37,11 +37,13 @@ func (wf *Agent) Research(ctx context.Context, query string) (string, error) {
 				Parts: []llms.ContentPart{llms.TextContent{Text: query}},
 			},
 		},
+		Locale: "zh-CN",
 	}
 	coordinator := NewCoordinator(wf.llm)
 	planner := NewPlanner(wf.llm, 3, 3)
 	researchTeam := NewResearchTeam(wf.llm)
 	researcher := NewResearcher(wf.llm, wf.config.TavilyKey)
+	coder := NewCoder(wf.llm)
 
 	nextStep, output, err := coordinator.Execute(ctx, &state)
 	if err != nil {
@@ -57,6 +59,8 @@ func (wf *Agent) Research(ctx context.Context, query string) (string, error) {
 			nextStep, output, err = researchTeam.Execute(ctx, &state)
 		case StepResearcher:
 			nextStep, output, err = researcher.Execute(ctx, &state)
+		case StepCoder:
+			nextStep, output, err = coder.Execute(ctx, &state)
 		case StepEnd:
 			return output, nil
 		default:

@@ -14,22 +14,20 @@ import (
 	"github.com/tmc/langchaingo/prompts"
 )
 
-var _ Node = (*Researcher)(nil)
+var _ Node = (*Coder)(nil)
 
-type Researcher struct {
-	llm       *openai.LLM
-	tavilyKey string
+type Coder struct {
+	llm *openai.LLM
 }
 
-func NewResearcher(llm *openai.LLM, tavilyKey string) *Researcher {
-	return &Researcher{
-		llm:       llm,
-		tavilyKey: tavilyKey,
+func NewCoder(llm *openai.LLM) *Coder {
+	return &Coder{
+		llm: llm,
 	}
 }
 
-func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep string, output string, err error) {
-	content, err := os.ReadFile("./internal/prompts/researcher.md")
+func (r *Coder) Execute(ctx context.Context, state *AgentState) (nextStep string, output string, err error) {
+	content, err := os.ReadFile("./internal/prompts/coder.md")
 	if err != nil {
 		slog.Error("read prompt template", "error", err)
 		return "", "", err
@@ -37,7 +35,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 
 	promptTemplate, err := prompts.NewPromptTemplate(
 		string(content),
-		[]string{"current_time", "locale"},
+		[]string{"current_time"},
 	).Format(map[string]any{
 		"current_time": time.Now().Format(time.RFC3339),
 		"locale":       state.Locale,
@@ -65,7 +63,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 			Parts: []llms.ContentPart{llms.TextContent{Text: fmt.Sprintf("#Task\n\ntitle: %s\n\n##description:%s", step.Title, step.Description)}},
 		}}
 
-	resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))
+	resp, err := r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.PythonTool, tool.BashTool}))
 	if err != nil {
 		slog.Error("generate content", "error", err)
 		return "", "", err
@@ -73,17 +71,17 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 
 	for _, toolcall := range resp.Choices[0].ToolCalls {
 		switch toolcall.FunctionCall.Name {
-		case "crawl":
+		case "python":
 			var args struct {
-				URL string `json:"url"`
+				Code string `json:"code"`
 			}
 			if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
 				slog.Error("unmarshal arguments", "error", err)
 				return "", "", err
 			}
-			output, err = tool.Crawl(ctx, args.URL)
+			output, err = tool.Python(ctx, args.Code)
 			if err != nil {
-				slog.Error("crawl", "error", err)
+				slog.Error("python", "error", err)
 				return "", "", err
 			}
 			message := llms.MessageContent{
@@ -97,17 +95,17 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 				},
 			}
 			messages = append(messages, message)
-		case "tavily_search":
+		case "bash":
 			var args struct {
-				Query string `json:"query"`
+				Cmd string `json:"cmd"`
 			}
 			if err := json.Unmarshal([]byte(toolcall.FunctionCall.Arguments), &args); err != nil {
 				slog.Error("unmarshal arguments", "error", err)
 				return "", "", err
 			}
-			output, err = tool.NewTavilySearchTool(r.tavilyKey).Search(ctx, args.Query)
+			output, err = tool.Bash(ctx, args.Cmd)
 			if err != nil {
-				slog.Error("search", "error", err)
+				slog.Error("bash", "error", err)
 				return "", "", err
 			}
 			message := llms.MessageContent{
@@ -127,7 +125,7 @@ func (r *Researcher) Execute(ctx context.Context, state *AgentState) (nextStep s
 		}
 	}
 
-	resp, err = r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.CrawlTool, tool.SearchTool}))
+	resp, err = r.llm.GenerateContent(ctx, messages, llms.WithTools([]llms.Tool{tool.PythonTool, tool.BashTool}))
 	if err != nil {
 		slog.Error("generate content", "error", err)
 		return "", "", err

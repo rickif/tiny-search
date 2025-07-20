@@ -8,11 +8,11 @@ const (
 )
 
 type Step struct {
-	NeedWebSearch   bool   `json:"need_web_search"`
+	NeedSearch      bool   `json:"need_web_search"`
 	Title           string `json:"title"`
 	Description     string `json:"description"`
 	StepType        string `json:"step_type"`
-	ExecutionResult string `json:"_"`
+	ExecutionResult string `json:"-"`
 }
 
 type Plan struct {
@@ -27,6 +27,7 @@ type AgentState struct {
 	LastPlan       *Plan
 	CurrentPlan    *Plan
 	PlanIterations int
+	Locale         string
 }
 
 const (

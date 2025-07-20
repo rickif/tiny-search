@@ -24,11 +24,16 @@ func (planner *ResearchTeam) Execute(ctx context.Context, state *AgentState) (ne
 		return StepPlanner, "", nil
 	}
 
-	var step Step
-	for _, step = range state.CurrentPlan.Steps {
-		if step.ExecutionResult == "" {
+	var step *Step
+	for i := range state.CurrentPlan.Steps {
+		if state.CurrentPlan.Steps[i].ExecutionResult == "" {
+			step = &state.CurrentPlan.Steps[i]
 			break
 		}
+	}
+
+	if step == nil {
+		return StepPlanner, "", nil
 	}
 
 	switch step.StepType {

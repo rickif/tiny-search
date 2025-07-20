@@ -38,8 +38,9 @@ func (coord *Coordinator) Execute(ctx context.Context, state *AgentState) (nextS
 	if err != nil {
 		return "", "", err
 	}
-	promptTemplate, err := prompts.NewPromptTemplate(string(content), []string{"current_time"}).Format(map[string]any{
+	promptTemplate, err := prompts.NewPromptTemplate(string(content), []string{"current_time", "locale"}).Format(map[string]any{
 		"current_time": time.Now().Format(time.RFC3339),
+		"locale":       state.Locale,
 	})
 	if err != nil {
 		return "", "", err

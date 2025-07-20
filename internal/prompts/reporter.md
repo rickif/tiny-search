@@ -1,5 +1,5 @@
 ---
-CURRENT_TIME: {{ CURRENT_TIME }}
+CURRENT_TIME: {{ .current_time }}
 ---
 
 You are a professional reporter responsible for writing clear, comprehensive reports based ONLY on provided information and verifiable facts.

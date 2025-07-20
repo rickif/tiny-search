@@ -41,6 +41,7 @@ func (planner *Planner) Execute(ctx context.Context, state *AgentState) (nextSte
 	promptTemplate, err := prompts.NewPromptTemplate(string(content), []string{"current_time", "max_step_num"}).Format(map[string]any{
 		"current_time": time.Now().Format(time.RFC3339),
 		"max_step_num": planner.maxStepNum,
+		"locale":       state.Locale,
 	})
 	if err != nil {
 		slog.Error("format planner prompt", "error", err)
